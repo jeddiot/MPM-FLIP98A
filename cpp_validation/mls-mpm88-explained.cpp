@@ -232,5 +232,5 @@ int main() {
 run commands:
 g++ mls-mpm88-explained.cpp -std=c++14 -lgdi32 -lpthread -O3 -o mls-mpm     
 .\mls-mpm.exe
-ffmpeg -framerate 60 -i frame%05d.png -c:v libx264 -pix_fmt yuv420p output.mp4
+ffmpeg -framerate 60 -i %05d.png -c:v libx264 -pix_fmt yuv420p output.mp4
 ----------------------------------------------------------------------------- */
