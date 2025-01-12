@@ -4,6 +4,14 @@ This project demonstrates the fundamental principles of the Material Point Metho
 
 This work was done in collaboration with **Prof. T.-H. Huang**. We intend to publish our work in 2025. You can find more about his work on his [personal website](https://huan0652.wixsite.com/thhuang).
 
+## Initial Validation
+
+We first validate our concept in the c++ source code using taichi. And material point movement turns out stable, as shown below.
+
+![](output.gif)
+
+We them proceed to develop our methods in Python for better maintenance.
+
 ## Features
 
 - **Updated Lagrangian Mechanics:** Decomposes acceleration, velocity, and position updates for improved simulation efficiency.
