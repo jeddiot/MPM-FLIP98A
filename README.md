@@ -8,7 +8,7 @@ This work was done in collaboration with **Prof. T.-H. Huang**. We intend to pub
 
 We first validate our concept in the c++ source code using taichi. And material point movement turns out stable, as shown below.
 
-<img src="output.gif" width="400" height="300" class="center">
+<img src="output.gif" width="400" height="400" style="display: block; margin-left: auto; margin-right: auto;">
 
 We them proceed to develop our methods in Python for better maintenance.
 
