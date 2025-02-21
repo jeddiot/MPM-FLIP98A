@@ -3,17 +3,18 @@ import taichi as ti
 import os as os
 import time
 from pyevtk.hl import pointsToVTK
-from functions import reproducingKernelFunction
-from config import SimulationConfig
+from functions import reproducingKernelFunction, penaltyBoundary
+from config import NumericalSettings, PhysicalQuantities, GravityField
 from fields import ParticleFields, GridFields, StabilizationFields, ProjectionFields, PenaltyMethodFields
 
-# Create an instance of the configuration class
-conf = SimulationConfig()
-particle = ParticleFields(conf.numericalSettings.numParticles)
-grid = GridFields(conf.numericalSettings.numGrids)
-stability = StabilizationFields(conf.numericalSettings.numGrids)
-projection = ProjectionFields(conf.numericalSettings.numGrids)
-penalty = PenaltyMethodFields(conf.numericalSettings.numCells)
+numerical = NumericalSettings()
+physical = PhysicalQuantities()
+gravitational = GravityField(numerical.fluidWidth, numerical.fluidHeight, physical.particleDensity, physical.gravity)
+particle = ParticleFields(numerical.numParticles)
+grid = GridFields(numerical.numGrids)
+stability = StabilizationFields(numerical.numGrids)
+projection = ProjectionFields(numerical.numGrids)
+penalty = PenaltyMethodFields(numerical.numCells)
 
 
 time0 = time.time()
@@ -22,77 +23,26 @@ ti.init(arch=ti.gpu, device_memory_GB=3.0)
 
 @ti.kernel
 def substep():
-    for i, j in mt_I:  # 归零，这很重要，不然计算会出错，有些数字会加到爆炸
-        vt_I[i, j] = [0, 0]  # $v^{t+\Delta t}_I$
-        vt_IInitial[i, j] = [0, 0]  # $v^t_I$
-        mt_I[i, j] = [[0, 0], [0, 0]]
-        volumet_I[i, j] = 0
-        pt_I[i, j] = 0
+    # reset after every timestep
+    for i, j in grid.mass_grid:
+        grid.velocity_grid[i, j] = [0, 0]
+        grid.velocity_grid_initial[i, j] = [0, 0]
+        grid.mass_grid[i, j] = [[0, 0], [0, 0]]
+        grid.volume_grid[i, j] = 0
+        grid.pressure_grid[i, j] = 0
 
-        # volume0_0[i,j] = 0
-        # volumet_0[i,j] = 0
-        # cell[i,j] = 0
-        divvt_0_denominator[i, j] = 0
-        divvt_0_numerator[i, j] = 0
-        divvt_0[i, j] = 0
+    if numerical.switch_penaltyEBC:
+        penaltyBoundary(penalty.left_boundary)
+        penaltyBoundary(penalty.right_boundary)
+        penaltyBoundary(penalty.bottom_boundary)
+        penaltyBoundary(penalty.top_boundary)
 
-    if switch_penaltyEBC:
-        for k in x_L_left:
-            base = (x_L_left[k] * inv_dx - shift).cast(int)
-            Psi_I, notused0, notused1 = reproducingKernelFunction(x_L_left[k], base, a, dx, nodeNum, dim, switch_getRK_Bspline)
-            s1 = 1
-            s2 = 0
-            S = ti.Matrix([[s1, 0], [0, s2]])
-            for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):
-                offset = ti.Vector([i, j])
-                if float(base[0] + offset[0]) >= 2:  # <= 2:
-                    mt_I[base + offset] += dx * beta * Psi_I[i, j] * S
-                if float(base[0] + offset[0]) < 2:  # >= num_cell - 2:
-                    mt_I[base + offset] += dx * beta * S
-
-        for k in x_L_right:
-            base = (x_L_right[k] * inv_dx - shift).cast(int)
-            Psi_I, notused0, notused1 = reproducingKernelFunction(x_L_right[k], base, a, dx, nodeNum, dim, switch_getRK_Bspline)
-            s1 = 1
-            s2 = 0
-            S = ti.Matrix([[s1, 0], [0, s2]])
-            for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):
-                offset = ti.Vector([i, j])
-                if float(base[0] + offset[0]) <= num_cell - 2:  # >= num_cell - 2:
-                    mt_I[base + offset] += dx * beta * Psi_I[i, j] * S
-                if float(base[0] + offset[0]) > num_cell - 2:  # >= num_cell - 2:
-                    mt_I[base + offset] += dx * beta * S
-
-        for k in x_L_bot:
-            base = (x_L_bot[k] * inv_dx - shift).cast(int)
-            Psi_I, notused0, notused1 = reproducingKernelFunction(x_L_bot[k], base, a, dx, nodeNum, dim, switch_getRK_Bspline)
-            s1 = 0
-            s2 = 1
-            S = ti.Matrix([[s1, 0], [0, s2]])
-            for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):
-                offset = ti.Vector([i, j])
-                if float(base[1] + offset[1]) >= 2:  # <= 2:
-                    mt_I[base + offset] += dx * beta * Psi_I[i, j] * S
-                if float(base[1] + offset[1]) < 2:  # >= num_cell - 2:
-                    mt_I[base + offset] += dx * beta * S
-
-        for k in x_L_top:
-            base = (x_L_top[k] * inv_dx - shift).cast(int)
-            Psi_I, notused0, notused1 = reproducingKernelFunction(x_L_top[k], base, a, dx, nodeNum, dim, switch_getRK_Bspline)
-            s1 = 0
-            s2 = 1
-            S = ti.Matrix([[s1, 0], [0, s2]])
-            for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):
-                offset = ti.Vector([i, j])
-                if float(base[1] + offset[1]) <= num_cell - 2:  # >= num_cell - 2:
-                    mt_I[base + offset] += dx * beta * Psi_I[i, j] * S
-                if float(base[1] + offset[1]) > num_cell - 2:  # >= num_cell - 2:
-                    mt_I[base + offset] += dx * beta * S
-
-    for p in xt_p:
-        cellBase = (xt_p[p] * inv_dx).cast(int)
-        base = (xt_p[p] * inv_dx - shift).cast(int)  # Define the bottom left corner of the surrounding 3x3 grid of neighboring nodes
-        fx = (xt_p[p] * inv_dx - base.cast(ti.f64)) * dx  # Define the vector from "base" to the current particle
+    for p in particle.position:
+        cellBase = (particle.position[p] / numerical.gridSpacing).cast(int)
+        # Define the bottom left corner of the surrounding 3x3 grid of neighboring nodes
+        base = (particle.position[p] / numerical.gridSpacing - numerical.gridNodeShift).cast(int)
+        vector_base2CurrentParticle = (particle.position[p] / numerical.gridSpacing - base.cast(ti.f64)) * \
+            numerical.gridSpacing
 
         # overlineF = ( (cell[cellBase[0], cellBase[1]] / detF[p]) ** (1/2) ) * F[p]
         # if stabilizationFBar:
@@ -105,67 +55,64 @@ def substep():
         # volumet_p[p] = volume0_p # update particle volumes using F-Bar
         # mt_p[p] = volumet_p[p] * rho # update particle masses using F-Bar
 
-        # Ft_p[p] = (ti.Matrix.identity(ti.f64, 2) + dt * Lt_p[p]) @ Ft_p[p]
+        # Ft_p[p] = (ti.Matrix.identity(ti.f64, 2) + dt * particle.velocity_gradient[p]) @ Ft_p[p]
 
         # if switch_US:
-        # sigma[p] = - pt_p[p] * ti.Matrix.identity(ti.f64, 2) + visc * (Lt_p[p] + Lt_p[p].transpose()) # Fluid model
+        # sigma[p] = - pt_p[p] * ti.Matrix.identity(ti.f64, 2) + visc * (particle.velocity_gradient[p] + particle.velocity_gradient[p].transpose()) # Fluid model
 
-        PartitionOfUnity[p] = ti.cast(0, ti.f64)  # reset PoU, consistency, and gradient consistency for each particle
-        Cons[p] = ti.cast(0, ti.f64)
-        Cons_dx[p] = ti.cast(0, ti.f64)
-        Cons_dy[p] = ti.cast(0, ti.f64)
+        particle.partitionofUnity[p] = ti.cast(0, ti.f64)  # reset PoU, consistency, and gradient consistency for each particle
+        particle.consistency[p] = ti.cast(0, ti.f64)
+        particle.consistency_dx[p] = ti.cast(0, ti.f64)
+        particle.consistency_dy[p] = ti.cast(0, ti.f64)
 
-        Psi_I, Psi_Icommax, Psi_Icommay = reproducingKernelFunction(xt_p[p], base, a, dx, nodeNum, dim, switch_getRK_Bspline)
+        shapeFunction_grid, shapeFunction_grid_dx, shapeFunction_grid_dy = reproducingKernelFunction(
+            particle.position[p], base, numerical.kernelSupportSize, numerical.gridSpacing, numerical.nodeCount,
+            numerical.dimension, numerical.switch_getRK_Bspline)
 
-        for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):  # for I \in 3 by 3 grid
-            gridNode = [float(i+base[0]) * dx, float(j+base[1]) * dx]  # Current grid node location
-            B_I = ti.Vector([Psi_Icommax[i, j], Psi_Icommay[i, j]])  # Assemble a phi gradient vector
-            PartitionOfUnity[p] += Psi_I[i, j]  # POU
-            Cons[p] += Psi_I[i, j] * gridNode[0] * gridNode[1]  # Consistency
-            Cons_dx[p] += B_I[0] * gridNode[0] * gridNode[1]  # Gradient consistency
-            Cons_dy[p] += B_I[1] * gridNode[0] * gridNode[1]  # Gradient consistency
+        for i, j in ti.static(ti.ndrange(numerical.nodeCount, numerical.nodeCount)):
+            currentGridNodeLocation = [float(i + base[0]) * numerical.gridSpacing, float(j + base[1])
+                                       * numerical.gridSpacing]  # Current grid node location
+            shapeFunction_grid_gradient = ti.Vector(
+                [shapeFunction_grid_dx[i, j], shapeFunction_grid_dy[i, j]])  # Assemble a phi gradient vector
+            particle.partitionofUnity[p] += shapeFunction_grid[i, j]
+            particle.consistency[p] += shapeFunction_grid[i, j] * currentGridNodeLocation[0] * currentGridNodeLocation[1]
+            particle.consistency_dx[p] += shapeFunction_grid_gradient[0] * currentGridNodeLocation[0] * currentGridNodeLocation[1]
+            particle.consistency_dy[p] += shapeFunction_grid_gradient[1] * currentGridNodeLocation[0] * currentGridNodeLocation[1]
 
             offset = ti.Vector([i, j])  # Vector of grid node positions relative to "base"
-            dpos = offset.cast(ti.f64)*dx - fx  # A vector from the current grid node to the current particle
+            # A vector from the current grid node to the current particle
+            dpos = offset.cast(ti.f64) * numerical.gridSpacing - vector_base2CurrentParticle
 
-            vt_I_APIC = Lt_p[p] @ dpos  # define the contribution of the velocity gradient to the particle momentum
+            # define the contribution of the velocity gradient to the particle momentum
+            APIC_velocity_grid = particle.velocity_gradient[p] @ dpos
 
-            volumet_I[base + offset] += Psi_I[i, j] * volumet_p[p]
-            mt_I[base + offset] += Psi_I[i, j] * mt_p[p] * ti.Matrix.identity(ti.f64, 2)
+            grid.volume_grid[base + offset] += shapeFunction_grid[i, j] * particle.volume[p]
+            grid.mass_grid[base + offset] += shapeFunction_grid[i, j] * particle.mass[p] * ti.Matrix.identity(ti.f64, 2)
 
-            # get v_I^{t}
-            if schemeAPIC:  # APIC v_I^{t}
-                vt_IInitial[base + offset] += Psi_I[i, j] * mt_p[p] * (vt_p[p] + vt_I_APIC)
-                vt_I[base + offset] += Psi_I[i, j] * mt_p[p] * (vt_p[p] + vt_I_APIC)
-            else:  # PIC v_I^{t}
-                vt_IInitial[base + offset] += Psi_I[i, j] * mt_p[p] * vt_p[p]
-                vt_I[base + offset] += Psi_I[i, j] * mt_p[p] * vt_p[p]  # obtain $(mv)^t_I$
-            # get v_I^{t + \Delta t}
-            # add external force $\Delta t \boldsymbol{F}_I^{int}$ to $(mv)^t_I$
-            vt_I[base + offset] += dt * volumet_p[p] * Psi_I[i, j] * fb[None]
-            # add internal force $\Delta t \boldsymbol{F}_I^{ext}$ to $(mv)^t_I$
-            vt_I[base + offset] -= dt * volumet_p[p] * (sigma[p] @ B_I)
+            grid.velocity_grid_initial[base + offset] += shapeFunction_grid[i, j] * particle.mass[p] * \
+                (particle.velocity[p] + numerical.switch_vt_I_APIC * APIC_velocity_grid)
+            grid.velocity_grid[base + offset] += shapeFunction_grid[i, j] * particle.mass[p] * \
+                (particle.velocity[p] + numerical.switch_vt_I_APIC * APIC_velocity_grid)
+
+            grid.velocity_grid[base + offset] += numerical.timeStep * particle.volume[p] * \
+                shapeFunction_grid[i, j] * gravitational.gravityField[None] - numerical.timeStep * \
+                particle.volume[p] * (particle.stress[p] @ shapeFunction_grid_gradient)
 
             # get PIC p_I^{t}
-            pt_I[base + offset] += Psi_I[i, j]*volumet_p[p]*pt_p[p]  # PIC pressure
-            # get p_I^{t + \Delta t}
-            pt_I[base + offset] -= dt * K * volumet_p[p] * Psi_I[i, j] * divvt_p[p]
+            grid.pressure_grid[base + offset] += shapeFunction_grid[i, j] * particle.volume[p] * \
+                particle.pressure[p] - numerical.timeStep * physical.bulkModulus * \
+                particle.volume[p] * shapeFunction_grid[i, j] * particle.divergenceofVelocity[p]
 
-        Cons[p] -= xt_p[p][0] * xt_p[p][1]  # Consistency
-        Cons_dx[p] -= float(1.0) * xt_p[p][1]  # Gradient consistency
-        Cons_dy[p] -= float(1.0) * xt_p[p][0]  # Gradient consistency
+        particle.consistency[p] -= particle.position[p][0] * particle.position[p][1]  # Consistency
+        particle.consistency_dx[p] -= float(1.0) * particle.position[p][1]  # Gradient consistency
+        particle.consistency_dy[p] -= float(1.0) * particle.position[p][0]  # Gradient consistency
 
-    for i, j in mt_I:
-        if volumet_I[i, j] != 0:
-            pt_I[i, j] /= volumet_I[i, j]  # pressure-volume parameter to pressure
-        if mt_I[i, j][0, 0] != 0 and mt_I[i, j][1, 1] != 0:  # and volumet_I[i, j] != 0:
-            vt_I[i, j] = mt_I[i, j].inverse() @ vt_I[i, j]  # momentum to velocity
-            # ------------------------施加边界条件------------------------
-            # i < nodeNum，若 nodeNum=3，即 i = 0，1，2
-            # i > num_g - nodeNum - 1，若 num_g=20，即 i = 17，18，19
-            # 所以说，意思就是—— x 和 y 方向都预留 3 个 grid nodes 的厚度。
-            # -----------------------------------------------------------
-            if switch_penaltyEBC:
+    for i, j in grid.mass_grid:
+        if grid.volume_grid[i, j] != 0:
+            grid.pressure_grid[i, j] /= grid.volume_grid[i, j]
+        if grid.mass_grid[i, j][0, 0] != 0 and grid.mass_grid[i, j][1, 1] != 0:
+            grid.velocity_grid[i, j] = grid.mass_grid[i, j].inverse() @ grid.velocity_grid[i, j]
+            if numerical.switch_penaltyEBC:
                 pass
             else:
                 if i < nodeNum and vt_I[i, j][0] < 0:
@@ -188,7 +135,7 @@ def substep():
 
     for p in xt_p:
         base = (xt_p[p] * inv_dx - shift).cast(int)  # 每个 particle 所属的 3x3 support 的左下角点位置
-        fx = (xt_p[p] * inv_dx - base.cast(ti.f64)) * dx  # 向量，由 base 指向 particle
+        vector_base2CurrentParticle = (xt_p[p] * inv_dx - base.cast(ti.f64)) * dx  # 向量，由 base 指向 particle
 
         vt_p_APIC = ti.Vector.zero(ti.f64, 2)  # Initialize an APIC velocity vector
         vt_p_FLIP = ti.Vector.zero(ti.f64, 2)  # Initialize a FLIP velocity vector
@@ -201,7 +148,7 @@ def substep():
         for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):
             B_I = ti.Vector([Psi_Icommax[i, j], Psi_Icommay[i, j]])  # 2 by 1 vector, assemble a phi gradient vector
             offset = ti.Vector([i, j])
-            # dpos = ( offset.cast(ti.f64) ) * dx - fx # define the distance from the particle to the current node
+            # dpos = ( offset.cast(ti.f64) ) * dx - vector_base2CurrentParticle # define the distance from the particle to the current node
             new_L += vt_I[base + offset].outer_product(B_I)  # define the velocity gradient
             new_divvt_p += vt_I[base + offset].dot(B_I)
 
@@ -215,8 +162,8 @@ def substep():
         vt_p[p] = eta * vt_p_FLIP + (1 - eta) * vt_p_APIC  # Define the particle velocity (FLIP blend)
         xt_p[p] += dt * vt_p[p]  # Advect particles NFLIP
 
-        Lt_p[p] = new_L
-        Ft_p[p] = (ti.Matrix.identity(ti.f64, 2) + dt * Lt_p[p]) @ Ft_p[p]  # Deformation gradient update
+        particle.velocity_gradient[p] = new_L
+        Ft_p[p] = (ti.Matrix.identity(ti.f64, 2) + dt * particle.velocity_gradient[p]) @ Ft_p[p]  # Deformation gradient update
         U_F, sig_F, V_F = ti.svd(Ft_p[p])  # Singular value decomposition
         J = ti.cast(1.0, ti.f64)
         for d in ti.static(range(dim)):
@@ -230,27 +177,8 @@ def substep():
         pt_p[p] -= dt*K*divvt_p[p]
         pt_p[p] = mixRatio * new_p + (1-mixRatio) * pt_p[p]
 
-        dotepsilon = 0.5 * (Lt_p[p] + Lt_p[p].transpose())
+        dotepsilon = 0.5 * (particle.velocity_gradient[p] + particle.velocity_gradient[p].transpose())
         sigma[p] = - pt_p[p] * ti.Matrix.identity(ti.f64, 2) + 2 * visc * dotepsilon
-
-    if switch_overlinedivv:
-        for p in xt_p:
-            cellBase = (xt_p[p] * inv_dx).cast(int)  # 每个 cellgrid 中心点的位置
-            base = (xt_p[p] * inv_dx - shift).cast(int)
-            Psi_I, Psi_Icommax, Psi_Icommay = reproducingKernelFunction(xt_p[p], base, a, dx, nodeNum, dim, switch_getRK_Bspline)
-            for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):
-                offset = ti.Vector([i, j])
-                divvt_0_denominator[base + offset] += volume0_p * Psi_I[i, j]
-                divvt_0_numerator[base + offset] += divvt_p[p] * volume0_p * Psi_I[i, j]
-        for i, j in divvt_0:
-            divvt_0[i, j] = divvt_0_numerator[i, j] / (divvt_0_denominator[i, j] + epsilon)
-        for p in xt_p:
-            # cellBase = (xt_p[p] * inv_dx).cast(int)
-            base = (xt_p[p] * inv_dx - shift).cast(int)
-            Psi_I, Psi_Icommax, Psi_Icommay = reproducingKernelFunction(xt_p[p], base, a, dx, nodeNum, dim, switch_getRK_Bspline)
-            for i, j in ti.static(ti.ndrange(nodeNum, nodeNum)):
-                offset = ti.Vector([i, j])
-                divvt_p[p] += Psi_I[i, j] * divvt_0[base + offset]
 
 
 x_pos1 = ti.field(dtype=ti.f64, shape=(np_x, np_y))

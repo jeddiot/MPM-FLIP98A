@@ -3,6 +3,17 @@ import sys
 import colorama
 import math
 
+from config import NumericalSettings, PhysicalQuantities, GravityField
+from fields import ParticleFields, GridFields, StabilizationFields, ProjectionFields, PenaltyMethodFields
+
+numerical = NumericalSettings()
+physical = PhysicalQuantities()
+gravitational = GravityField(numerical.fluidWidth, numerical.fluidHeight, physical.particleDensity, physical.gravity)
+particle = ParticleFields(numerical.numParticles)
+grid = GridFields(numerical.numGrids)
+stability = StabilizationFields(numerical.numGrids)
+projection = ProjectionFields(numerical.numGrids)
+penalty = PenaltyMethodFields(numerical.numCells)
 
 @ti.func
 def reproducingKernelFunction(xp, base, a, dx, nodeNum, dim, switch_getRK_Bspline):
@@ -57,7 +68,40 @@ def reproducingKernelFunction(xp, base, a, dx, nodeNum, dim, switch_getRK_Bsplin
 
     return phiMat, dphiXMat, dphiYMat
 
-# Function to generate file paths based on simulation conditions
+@ti.func
+def penaltyBoundary(boundary):
+    for i in boundary:
+        base = (boundary[i] / numerical.gridSpacing - numerical.gridNodeShift).cast(int)
+        shapeFunction_grid, _, _ = reproducingKernelFunction(boundary[i], base, numerical.kernelSupportSize, numerical.gridSpacing, numerical.nodeCount, numerical.dimension, numerical.switch_getRK_Bspline)
+        s1 = 1
+        s2 = 0
+        S = ti.Matrix([[s1, 0], [0, s2]])
+        for i, j in ti.static(ti.ndrange(numerical.nodeCount, numerical.nodeCount)):
+            offset = ti.Vector([i, j])
+
+            if boundary == penalty.left_boundary:
+                if float(base[0] + offset[0]) >= 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * shapeFunction_grid[i, j] * S
+                if float(base[0] + offset[0]) < 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * S
+
+            if boundary == penalty.right_boundary:
+                if float(base[0] + offset[0]) <= numerical.numCells - 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * shapeFunction_grid[i, j] * S
+                if float(base[0] + offset[0]) > numerical.numCells - 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * S
+
+            if boundary == penalty.bottom_boundary:
+                if float(base[1] + offset[1]) >= 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * shapeFunction_grid[i, j] * S
+                if float(base[1] + offset[1]) < 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * S
+
+            if boundary == penalty.top_boundary:
+                if float(base[1] + offset[1]) <= numerical.numCells - 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * shapeFunction_grid[i, j] * S
+                if float(base[1] + offset[1]) > numerical.numCells - 2:
+                    grid.momentum_grid[base + offset] += numerical.gridSpacing  * numerical.penalty * S
 
 
 def format_exp(x, n, d=6):

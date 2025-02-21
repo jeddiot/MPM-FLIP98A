@@ -3,6 +3,13 @@ import taichi as ti
 
 class NumericalSettings:
     def __init__(self):
+
+        # Switches
+        self.switch_vt_I_APIC = 1  # True: velocity APIC, False: velocity PIC
+        self.switch_overlineF = False  # F-Bar pressure stabilization
+        self.switch_penaltyEBC = False
+        self.switch_getRK_Bspline = True  # True: B-spline kernel, False: Tent kernel
+
         # Numerical Parameters
         self.dimension = 2  # Problem dimension
         self.epsilon = 1e-15  # Numerical tolerance
