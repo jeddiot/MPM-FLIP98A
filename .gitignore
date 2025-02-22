@@ -1,2 +1,5 @@
 tmp/
 mls-mpm.exe
+mov_mixed_dt1e-5/
+vtk_mixed_dt1e-5/
+__pycache__/

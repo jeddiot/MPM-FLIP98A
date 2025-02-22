@@ -7,6 +7,7 @@ class ParticleFields:
         self.velocity = ti.Vector.field(2, dtype=ti.f64, shape=num_p)
         self.velocity_gradient = ti.Matrix.field(2, 2, dtype=ti.f64, shape=num_p)
         self.deformation_gradient = ti.Matrix.field(2, 2, dtype=ti.f64, shape=num_p)
+        self.determinant_of_deformation_gradient = ti.Matrix.field(2, 2, dtype=ti.f64, shape=num_p)
         self.stress = ti.Matrix.field(2, 2, dtype=ti.f64, shape=num_p)
         self.material_id = ti.field(dtype=int, shape=num_p)
         self.volume = ti.field(dtype=ti.f64, shape=num_p)
@@ -16,7 +17,8 @@ class ParticleFields:
         self.consistency_dx = ti.field(dtype=ti.f64, shape=num_p)
         self.consistency_dy = ti.field(dtype=ti.f64, shape=num_p)
         self.pressure = ti.field(dtype=ti.f64, shape=num_p)
-        self.divergenceofVelocity = ti.Vector.field(2, dtype=ti.f64, shape=num_p)
+        self.divergenceofVelocity = ti.field(dtype=ti.f64, shape=num_p)
+        self.particleDensity = ti.field(dtype=ti.f64, shape=num_p)
 
 
 class GridFields:
