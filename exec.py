@@ -6,7 +6,7 @@ import taichi as ti
 
 ti.init(arch=ti.gpu, device_memory_GB=3.0)
 
-from functions import createFilePaths, progressBar, initialize_Cubes, post_process, substep
+from functionsConfidential import createFilePaths, progressBar, initialize_Cubes, post_process, substep
 from config import NumericalSettings, PhysicalQuantities, GravityField
 from fields import ParticleFields, GridFields, StabilizationFields, ProjectionFields, PenaltyMethodFields
 

@@ -66,6 +66,8 @@ class NumericalSettings:
         self.penaltyParameter = self.penalty * \
             physical.particleDensity * self.gridSpacing**2
 
+        self.valueType = ti.f64
+
 
 class GravityField:
     def __init__(self, numerical: NumericalSettings, physical: PhysicalQuantities):
