@@ -1,6 +1,6 @@
 tmp/
 mls-mpm.exe
-mov_dt1e-5_pointwise/
-vtk_dt1e-5_pointwise/
+mov_dt1e-5_mixed/
+vtk_dt1e-5_mixed/
 __pycache__/
 functionsConfidential.py
