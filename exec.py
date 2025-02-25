@@ -1,7 +1,6 @@
 import numpy as np
 import os as os
 import time
-from pyevtk.hl import pointsToVTK
 import taichi as ti
 
 ti.init(arch=ti.gpu, device_memory_GB=3.0)
@@ -14,11 +13,11 @@ from fields import ParticleFields, GridFields, StabilizationFields, ProjectionFi
 physical = PhysicalQuantities()
 numerical = NumericalSettings(physical)
 gravitational = GravityField(numerical, physical)
-particle = ParticleFields(numerical.numParticles)
-grid = GridFields(numerical.numGrids)
-stability = StabilizationFields(numerical.numGrids)
-projection = ProjectionFields(numerical.numGrids)
-penalty = PenaltyMethodFields(numerical.numCells)
+particle = ParticleFields(numerical.numParticles, numerical.valueType)
+grid = GridFields(numerical.numGrids, numerical.valueType)
+stability = StabilizationFields(numerical.numGrids, numerical.valueType)
+projection = ProjectionFields(numerical.numGrids, numerical.valueType)
+penalty = PenaltyMethodFields(numerical.numCells, numerical.valueType)
 
 
 time0 = time.time()
@@ -37,15 +36,15 @@ if not os.path.exists(vtkpath):
 
 count = 0
 # while not gui.get_event(ti.GUI.ESCAPE, ti.GUI.EXIT):
-while (numerical.totalTime < numerical.simulationTime):
+while (numerical.currentTime < numerical.simulationTime):
     # the 5e-4 here acts as the frame rate
     for s in range(int(5e-4 // numerical.timeStep)):
         substep()
-        count = count + 1
-        numerical.totalTime += numerical.timeStep
+        count += 1
+        numerical.currentTime += numerical.timeStep
 
-    progressBar(numerical.totalTime, numerical.simulationTime)
-    post_process(numerical, particle, gui, vtkpath, filepath)
+    progressBar(numerical.currentTime, numerical.simulationTime)
+    post_process(numerical.numParticles, gui, vtkpath, filepath)
 
 time1 = time.time()
 print('Run Time:', time1 - time0)
