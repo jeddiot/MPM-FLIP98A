@@ -1,20 +1,38 @@
-# Overview
+# Developing Stabilized Material Point Method for Free Surface Flow Modeling
 
-This project demonstrates the fundamental principles of the Material Point Method (MPM) with a focus on the Concurrent Material Point Method (Concurrent MPM), as developed in my master's thesis. The implementation draws inspiration from Taichi, a computational framework created by Prof. Yuanming Hu et al. at MIT, and integrates various velocity solvers.
+## Overview
 
-This work was done in collaboration with **Prof. T.-H. Huang**. You can find more about his work on his [personal website](https://huan0652.wixsite.com/thhuang).
+This project is part of **Jedd (Cheng-Chun Yang)'s** master's thesis titled *"Developing Stabilized Material Point Method for Free Surface Flow Modeling"* (開發穩態物質點法應用於自由表面流建模), advised by **Prof. Tsung-Hui Huang** at National Tsing Hua University, 2024. The work is set to be published in 2025. For more information about this work, please visit [Prof. Tsung-Hui Huang's personal website](https://huan0652.wixsite.com/thhuang).
+
+### Key Files
+
+- `config.py`: Specifies the numerical settings for the simulation.
+- `fields.py`: Declares the Taichi fields used in the simulation.
+- `exec.py`: The entry point where the iteration of the simulation takes place.
+- `functionsConfidential.py`: Contains the innovative algorithm for the **Concurrent Material Point Method (MPM)**, specifically demonstrated in the `subStep()` function.
+
+This simulation is powered by the **Taichi runtime environment**, a high-performance computational framework developed by **Prof. Yuanming Hu** and colleagues. The implementation of the algorithm is inspired by the **Affine Particle-In-Cell (APIC)** method (Jiang et al., 2015) and the **Fluid Implicit Particle (FLIP)** method.
+
+### Contributions
+
+- Innovative algorithm under material point method scheme for computational fluid dynamics.
+- A practical programming implementation using Taichi's computational capabilities.
+
+We hope to contribute to the community's understanding and application of stabilized numerical methods in fluid dynamics.
 
 ## Confidentiality Warning
 
 The file ```functionsConfidential.py``` is not uploaded due to laboratory policy regarding confidential research materials. This file contains proprietary implementations that cannot be publicly shared. However, this repository includes a simplified demo showcasing the core concepts and techniques. For more information, please contact National Tsing Hua University, Extreme Event Computation Lab.
 
-## Initial Validation
+## Demonstration
 
-We first validate our concept in the C++ source code using Taichi. The result yields a stable solution as shown below.
+We first validate our concept in the c++ source code using Taichi. The simulation yields a stable solution, as shown below.
 
 <img src="output.gif" width="400" height="400" style="display: block; margin-left: auto; margin-right: auto;">
 
 We them proceed to develop our methods in Python for better maintenance.
+
+(Will be uploaded in the near future.)
 
 ## Features
 

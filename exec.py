@@ -6,7 +6,7 @@ import taichi as ti
 
 ti.init(arch=ti.gpu, device_memory_GB=3.0)
 
-from functionsConfidential import createFilePaths, progressBar, initialize_Cubes, post_process, substep
+from functionsConfidential import createFilePaths, progressBar, initialize_Cubes, post_process, subStep
 from config import NumericalSettings, PhysicalQuantities, GravityField
 from fields import ParticleFields, GridFields, StabilizationFields, ProjectionFields, PenaltyMethodFields
 
@@ -34,7 +34,7 @@ count = 0
 # while not gui.get_event(ti.GUI.ESCAPE, ti.GUI.EXIT):
 while (numerical.totalTime < numerical.simulationTime):
     for s in range(int(numerical.frameRate // numerical.timeStep)):
-        substep()
+        subStep()
         count += 1
         numerical.totalTime += numerical.timeStep
 
