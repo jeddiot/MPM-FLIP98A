@@ -5,7 +5,7 @@ class PhysicalQuantities:
     def __init__(self):
         self.dynamicViscosity = 1e-3  # [Pa·s]
         self.poissonsRatio = 4.999e-1  # unitless
-        self.bulkModulus = 2e9  # [Pa]
+        self.bulkModulus = 2e6  # [Pa]
         self.youngsModulus = self.bulkModulus * 2 * (1 - self.poissonsRatio)  # [Pa]
         self.shearModulus = self.bulkModulus * (1 - self.poissonsRatio) / (1 + self.poissonsRatio)  # [Pa]
         self.particleDensity = 997.5  # [kg/m³]
@@ -21,20 +21,20 @@ class NumericalSettings:
         self.switch_kernelFunction = True  # True bspline, else tent
         self.dimension = 2
         self.numericalTolerance = 1e-15
-        self.simulationTime = 0.1
-        self.totalTime = float(0)
-        self.timeStep = 1e-5
+        self.simulationTime = 3
+        self.totalTime = 0e-15
+        self.timeStep = 1e-6
         self.penalty = 1e6
         self.pressureMixingRatio = 0  # 1mixed, 0pt
         self.flipBlendParameter = 0 # 1flp, 0apic
-        self.numParticlesX = 80
-        self.numParticlesY = 40
+        self.numParticlesX = 65
+        self.numParticlesY = 130
         self.numParticles = self.numParticlesX * self.numParticlesY
-        self.domainLength = 6  # [m]
-        self.fluidWidth = 4  # [m]
-        self.fluidHeight = 2  # [m]
+        self.domainLength = 0.4375  # [m]
+        self.fluidWidth = 0.057  # [m]
+        self.fluidHeight = 0.114  # [m]
         self.initialParticleVolume = (self.fluidWidth * self.fluidHeight) / self.numParticles
-        self.numGrids = 75
+        self.numGrids = 105
         self.numCells = self.numGrids - 1
         self.gridSpacing = self.domainLength / float(self.numCells - 4)
         self.inverseGridSpacing = 1 / self.gridSpacing
@@ -43,7 +43,7 @@ class NumericalSettings:
         self.maxNumof1DgridNodesWithinSupport = int(self.kernelSupportSize * self.inverseGridSpacing * 2 + self.numericalTolerance)
         self.gridNodeShift = float(self.kernelSupportSizeNormalized - 1.0)
         self.penaltyParameter = self.penalty * physical.particleDensity * self.gridSpacing**2
-        self.frameRate = 5e-4
+        self.frameRate = 1e-2  # save every 100th frame (adjust as needed)
 
 
 class GravityField:
